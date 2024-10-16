@@ -4,6 +4,10 @@
     "service": "devcontainer",
     "workspaceFolder": "/workspace",
     "remoteUser": "vscode",
+    "forwardPorts": [
+        "jaeger:16686",
+        "victoriametrics:8428"
+    ],
     "containerUser": "vscode",
     "customizations": {
         "vscode": {

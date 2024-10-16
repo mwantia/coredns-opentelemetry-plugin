@@ -4,16 +4,12 @@ services:
 
   jaeger:
     image: jaegertracing/jaeger:latest
-    ports:
-      - 16686:16686
     command: ["--config", "/config/jaeger.yml"]
     volumes:
       - ./jaeger/config.yml:/config/jaeger.yml:ro
 
   victoriametrics:
     image: victoriametrics/victoria-metrics:latest
-    ports:
-      - 8428:8428
     command: ["--promscrape.config=/config/prometheus.yml"]
     volumes:
       - ./victoriametrics/prometheus.yml:/config/prometheus.yml:ro
