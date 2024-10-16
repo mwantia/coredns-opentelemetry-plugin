@@ -6,40 +6,40 @@ import (
 	"github.com/coredns/coredns/plugin"
 	"github.com/mwantia/coredns-otel-plugin/logging"
 	"github.com/mwantia/coredns-otel-plugin/metrics"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
 
+const PluginName string = "opentelemetry"
+
 type OtelPlugin struct {
-	Next   plugin.Handler
-	Cfg    OtelConfig
-	Tracer trace.Tracer
+	Next     plugin.Handler
+	Cfg      OtelConfig
+	Provider *sdktrace.TracerProvider
+	Tracer   trace.Tracer
 }
 
 func init() {
-	plugin.Register("otel", setup)
+	plugin.Register(PluginName, setup)
 }
 
 func (p OtelPlugin) Name() string {
-	return "otel"
+	return PluginName
 }
 
 func setup(c *caddy.Controller) error {
 	p, err := CreatePlugin(c)
 	if err != nil {
 		logging.Log.Errorf("%v", err)
-		return plugin.Error("netboxdns", err)
+		return plugin.Error(PluginName, err)
 	}
 
-	c.OnStartup(func() error {
-		if err := metrics.Register(); err != nil {
-			return err
-		}
-		if err := p.OnStartup(); err != nil {
-			return err
-		}
+	c.OnStartup(p.OnStartup)
+	c.OnShutdown(p.OnShutdown)
 
-		return nil
-	})
+	if err := metrics.Register(); err != nil {
+		return err
+	}
 
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
 		p.Next = next

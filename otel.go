@@ -3,7 +3,6 @@ package otel
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/dnstest"
@@ -21,7 +20,9 @@ import (
 )
 
 func (p *OtelPlugin) OnStartup() error {
-	exporter, err := otlptracehttp.New(context.Background(),
+	ctx := context.Background()
+
+	exporter, err := otlptracehttp.New(ctx,
 		otlptracehttp.WithEndpoint(p.Cfg.Endpoint),
 		otlptracehttp.WithInsecure(),
 	)
@@ -31,8 +32,8 @@ func (p *OtelPlugin) OnStartup() error {
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter,
-			sdktrace.WithBatchTimeout(5*time.Second),
-			sdktrace.WithMaxExportBatchSize(10),
+			sdktrace.WithBatchTimeout(p.GetBatchTimeout()),
+			sdktrace.WithMaxExportBatchSize(p.GetBatchSize()),
 		),
 		sdktrace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
@@ -41,10 +42,22 @@ func (p *OtelPlugin) OnStartup() error {
 			semconv.TelemetrySDKLanguageKey.String("go"),
 			attribute.String("hostname", p.GetHostname()),
 		)),
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(p.GetSamplingRateFraction())),
 	)
 
 	otel.SetTracerProvider(tp)
+	p.Provider = tp
 	p.Tracer = otel.Tracer("coredns.otel")
+
+	return nil
+}
+
+func (p *OtelPlugin) OnShutdown() error {
+	ctx := context.Background()
+
+	if err := p.Provider.Shutdown(ctx); err != nil {
+		return fmt.Errorf("failed to shutdown provider: %v", err)
+	}
 
 	return nil
 }
@@ -55,7 +68,7 @@ func (p OtelPlugin) ServeDNS(ctx context.Context, writer dns.ResponseWriter, msg
 	// Don't use the plugin name, since this will act as root
 	ctx, span := p.Tracer.Start(ctx, "ServeDNS",
 		trace.WithAttributes(
-			attribute.String("dns.name", req.Name()),
+			attribute.String("dns.fqdn", dns.Fqdn(req.Name())),
 			attribute.String("dns.type", req.Type()),
 			attribute.String("dns.proto", req.Proto()),
 			attribute.String("dns.remote", req.IP()),
@@ -65,17 +78,15 @@ func (p OtelPlugin) ServeDNS(ctx context.Context, writer dns.ResponseWriter, msg
 	defer span.End()
 
 	rw := dnstest.NewRecorder(writer)
-	status, err := plugin.NextOrFailure(p.Name(), p.Next, ctx, rw, msg)
-
+	rcode, err := plugin.NextOrFailure(p.Name(), p.Next, ctx, rw, msg)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 	}
 
 	span.SetAttributes(
-		attribute.Int("dns.rcode", rw.Rcode),
-		attribute.Int("dns.status", status),
+		attribute.String("dns.rcode", dns.RcodeToString[rcode]),
 	)
 
-	return status, err
+	return rcode, err
 }
