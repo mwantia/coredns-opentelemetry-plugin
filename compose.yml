@@ -1,0 +1,15 @@
+services:
+  coredns:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 5301:53/udp
+      - 5301:53/tcp
+    volumes:
+      - ./build/Corefile:/app/Corefile
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - 16686:16686

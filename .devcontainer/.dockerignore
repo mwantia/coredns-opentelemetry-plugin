@@ -1,0 +1,4 @@
+.dockerignore
+devcontainer.json
+compose.yml
+README.md
