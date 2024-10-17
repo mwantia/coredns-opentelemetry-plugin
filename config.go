@@ -1,4 +1,4 @@
-package otel
+package opentelemetry
 
 import (
 	"os"
@@ -71,8 +71,8 @@ func (p OtelPlugin) GetSamplingRateFraction() float64 {
 	rate, err := strconv.Atoi(p.Cfg.SamplingRate)
 	if err != nil {
 		// Default is 5
-		return 0.2
+		return float64(5)
 	}
 
-	return 1.0 / float64(rate)
+	return float64(rate)
 }

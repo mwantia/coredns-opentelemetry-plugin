@@ -1,22 +1,20 @@
-package otel
+package opentelemetry
 
 import (
+	"context"
+
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
-	"github.com/mwantia/coredns-otel-plugin/logging"
-	"github.com/mwantia/coredns-otel-plugin/metrics"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/trace"
+	"github.com/mwantia/coredns-opentelemetry-plugin/metrics"
+	"github.com/mwantia/coredns-opentelemetry-plugin/otel"
 )
 
 const PluginName string = "opentelemetry"
 
 type OtelPlugin struct {
-	Next     plugin.Handler
-	Cfg      OtelConfig
-	Provider *sdktrace.TracerProvider
-	Tracer   trace.Tracer
+	Next plugin.Handler
+	Cfg  OtelConfig
 }
 
 func init() {
@@ -30,16 +28,37 @@ func (p OtelPlugin) Name() string {
 func setup(c *caddy.Controller) error {
 	p, err := CreatePlugin(c)
 	if err != nil {
-		logging.Log.Errorf("%v", err)
 		return plugin.Error(PluginName, err)
 	}
 
-	c.OnStartup(p.OnStartup)
-	c.OnShutdown(p.OnShutdown)
+	var shutdown func(ctx context.Context) error
 
-	if err := metrics.Register(); err != nil {
+	c.OnStartup(func() error {
+		if err := metrics.Register(); err != nil {
+			return err
+		}
+
+		ctx := context.Background()
+		shutdown, err = otel.SetupOpentelemetry(ctx, otel.OpenTelemtryConfig{
+			Endpoint:     p.Cfg.Endpoint,
+			ServiceName:  p.Cfg.ServiceName,
+			Hostname:     p.GetHostname(),
+			BatchTimeout: p.GetBatchTimeout(),
+			BatchSize:    p.GetBatchSize(),
+			SamplingRate: p.GetSamplingRateFraction(),
+		})
+
 		return err
-	}
+	})
+
+	c.OnShutdown(func() error {
+		if shutdown != nil {
+			ctx := context.Background()
+			return shutdown(ctx)
+		}
+
+		return nil
+	})
 
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
 		p.Next = next

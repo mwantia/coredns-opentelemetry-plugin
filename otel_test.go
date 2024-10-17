@@ -1,4 +1,4 @@
-package otel
+package opentelemetry
 
 import (
 	"context"
@@ -11,13 +11,13 @@ import (
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/plugin/test"
 	"github.com/miekg/dns"
-	"github.com/mwantia/coredns-otel-plugin/logging"
+	"github.com/mwantia/coredns-opentelemetry-plugin/logging"
+	otelsetup "github.com/mwantia/coredns-opentelemetry-plugin/otel"
 )
 
 func TestOtel(tst *testing.T) {
 	OverwriteStdOut()
 
-	ctx := context.TODO()
 	c := caddy.NewTestController("dns", `
 		opentelemetry {
 			endpoint jaeger:4318
@@ -34,14 +34,24 @@ func TestOtel(tst *testing.T) {
 		Cfg: *cfg,
 	}
 
-	if err := p.OnStartup(); err != nil {
-		tst.Errorf("Unable to start plugin: %v", err)
-	}
+	ctx := context.TODO()
+	shutdown, err := otelsetup.SetupOpentelemetry(ctx, otelsetup.OpenTelemtryConfig{
+		Endpoint:     p.Cfg.Endpoint,
+		ServiceName:  p.Cfg.ServiceName,
+		Hostname:     p.GetHostname(),
+		BatchTimeout: p.GetBatchTimeout(),
+		BatchSize:    p.GetBatchSize(),
+		SamplingRate: p.GetSamplingRateFraction(),
+	})
 
 	RunTests(ctx, tst, p)
 
-	if err := p.OnShutdown(); err != nil {
-		tst.Errorf("Unable to gracefully shutdown plugin: %v", err)
+	if shutdown != nil {
+		// time.Sleep(10 * time.Second)
+		err := shutdown(ctx)
+		if err != nil {
+			tst.Errorf("Unable to gracefully shutdown plugin: %v", err)
+		}
 	}
 }
 

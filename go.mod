@@ -1,4 +1,4 @@
-module github.com/mwantia/coredns-otel-plugin
+module github.com/mwantia/coredns-opentelemetry-plugin
 
 go 1.22.5
 
@@ -31,7 +31,9 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/quic-go/quic-go v0.42.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.31.0 // indirect
+	go.opentelemetry.io/otel/log v0.7.0 // indirect
 	go.opentelemetry.io/otel/metric v1.31.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.31.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/crypto v0.28.0 // indirect
@@ -55,5 +57,8 @@ require (
 	github.com/prometheus/client_golang v1.20.4
 	go.opentelemetry.io/otel v1.31.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.31.0
+	go.opentelemetry.io/otel/exporters/stdout/stdoutlog v0.7.0
+	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.31.0
+	go.opentelemetry.io/otel/sdk/log v0.7.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b // indirect
 )
