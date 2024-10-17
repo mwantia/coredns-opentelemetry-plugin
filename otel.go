@@ -8,26 +8,17 @@ import (
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
 
-	"go.opentelemetry.io/otel"
+	otelsetup "github.com/mwantia/coredns-opentelemetry-plugin/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 )
 
 func (p OtelPlugin) ServeDNS(ctx context.Context, writer dns.ResponseWriter, msg *dns.Msg) (int, error) {
 	req := request.Request{W: writer, Req: msg}
 
 	// Don't use the plugin name, since this will act as root
-	tracer := otel.Tracer("github.com/mwantia/coredns-opentelemetry-plugin")
-	ctx, span := tracer.Start(ctx, "ServeDNS",
-		trace.WithAttributes(
-			attribute.String("dns.fqdn", dns.Fqdn(req.Name())),
-			attribute.String("dns.type", req.Type()),
-			attribute.String("dns.proto", req.Proto()),
-			attribute.String("dns.remote", req.IP()),
-		),
-		trace.WithSpanKind(trace.SpanKindServer),
-	)
+	ctx, span := otelsetup.StartDnsServerTracerSpan(ctx, req,
+		"github.com/mwantia/coredns-opentelemetry-plugin", "ServeDNS")
 	defer span.End()
 
 	rw := dnstest.NewRecorder(writer)
